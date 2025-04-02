@@ -1,5 +1,4 @@
 provider "aws" {
-  version = "5.90.0"
   region = us-east-1
 }
 resource "aws_instance" "servernode" {
@@ -8,3 +7,4 @@ resource "aws_instance" "servernode" {
   tags = {
     Name = "Deploy"
   }
+}
