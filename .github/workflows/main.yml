@@ -46,14 +46,12 @@ jobs:
         id: terraform_apply
         run: terraform apply -auto-approve tfplan
         continue-on-error: false  # This will fail the job if `terraform apply` fails
-
+      
+      
       - name: Create PR to Main if Deploying to Staging
         id: terraform_pr_rise
-        if: github.ref == 'refs/heads/testing' && steps.terraform_apply.outcome == 'success'
-        run: |
-          # Ensure GitHub CLI is installed
-          sudo apt-get install gh
-          gh auth login --with-token < ${GITHUB_TOKEN}
-          gh pr create --title "Promote testing to Prod" --body "Merging latest staging infrastructure changes to production." --base main --head testing
+        if: github.ref == 'refs/heads/staging' && steps.terraform_apply.outcome == 'success'
+        run: gh pr create --title "Promote Staging to Prod" --body "Merging latest staging infrastructure changes to production." --base main --head staging
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+ 
