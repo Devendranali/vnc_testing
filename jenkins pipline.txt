@@ -1,0 +1,681 @@
+--------------------------------------------------------------------------------------------------
+FOR DOCKER STAGE :PIPELINE
+--------------------------------------------------------------------------------------------------
+pipeline {
+    agent any  // This runs the pipeline on any available agent (Jenkins node)
+    environment {
+        DOCKER_IMAGE_NAME = 'solar_system'  // Docker image name (replace accordingly)
+        DOCKER_IMAGE_TAG = '1'  // Docker image tag
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Checkout the main branch from the repository
+                git branch: 'main', url: 'https://github.com/vanthiyadhevan/solar-system-gitea-jenkins-advanced.git'
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                // Install dependencies using npm (Node.js project)
+                sh 'npm install --no-audit'
+            }
+        }
+
+        stage('Dependency Check') {
+            steps {
+                // Run a dependency check using npm audit
+                sh 'npm audit fix --force'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                script {
+                    // Build Docker image
+                    sh '''
+                        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .
+                    '''
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+----------------------------------------------------------------------------------------------------------------------
+
+For SONARQUBE: PIPELINE
+----------------------------------------------------------------------------------------------------------------------
+pipeline {
+    agent any
+    environment {
+        scannerHome = tool 'SonarQube'
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'master', url: 'https://github.com/Devendranali/one.git'
+            }
+        }
+        stage('Maven Build') {
+            steps {
+                sh 'mvn -v'
+                sh 'mvn clean install'
+            }
+        }
+        stage('Run SonarQube') {
+            steps {
+                withSonarQubeEnv(credentialsId: 'Sonar-token', installationName: 'Sonar-Qube') {
+                    sh """
+                    ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=vnc-1 \
+                        -Dsonar.projectName="vnc" \
+                        -Dsonar.projectVersion=1.0 \
+                        -Dsonar.sources=src
+                    """
+                }
+            }
+        }
+    }
+}
+
+
+
+*******************************************************************java**************
+FOR DOCKER STAGE CLEAN UP ALL AND LATEST UPDATED : PIPELINE
+*************************************************************************************
+
+pipeline {
+    agent any 
+    stages {
+        stage (CLEANUP){
+            steps {
+	cleanWs()
+             }
+        }
+        stage (CHECKOUT) {
+            steps {
+                git branch: 'master', url: 'https://github.com/Devendranali/one.git'
+            }
+        }
+        stage (MAVEN) {
+            steps {
+                sh 'mvn clean install -Dskiptests'
+            }
+        }
+        stage (TEST) {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage (CODECOVERAGE) {
+            steps {
+                sh 'mvn checkstyle:checkstyle'
+            }
+        }
+        stage('Stop and Remove Containers') {
+            steps {
+                script {
+                    // Stop and remove any running containers
+                    sh 'docker stop $(docker ps -q) || true'  // Stop all running containers
+                    sh 'docker rm -f $(docker ps -a -q) || true'  // Remove all containers
+                }
+            }
+        }
+        stage (DOCKER) {
+            steps {
+                sh 'docker rmi $(docker images -f "dangling=true" -q) || true'
+                sh 'docker rmi -f $(docker images -q) || true'
+                sh 'docker build -t one:1 .'
+            }
+        }
+        stage (CONTAINER) {
+            steps {
+                sh 'docker rm -f myapp || true'
+                sh 'docker run -itd --name myapp -p 8081:8080 one:1'
+            }
+        }
+    }
+}
+
+
+
+`````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````
+
+LINKS:::
+
+`````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````
+
+deploying the application in another ec2 server --k3s --
+
+k3s link::   curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_SELINUX_RPM=true sh -
+	sudo ln -s /usr/local/bin/kubectl /usr/bin/kubectl
+	sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+	kubectl get nodes
+
+kubectl link::  curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+FOR PUSHING IMAGE TO AWS ECR REPO AND DEPLOYED TO K3S IN ANOTHER EC2::  WORKING - PIPELINE
+
+
+AWS CLI:  --> INSTALL 
+		# 1. Download the installer
+		curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+		unzip awscliv2.zip
+		sudo ./aws/install
+
+	  --> AFTER CREATE AWS ECR REPO USING CLI
+		aws ecr create-repository --repository-name one --region us-east-1
+	--> ATTACH THE ROLE TO THE JENKINS INSTANCE TO CONNECT WITH AWS ECR TO PUSH 		      IMAGE ARE PULL USE -- POLICY -- AMAZONEC2CONTAINERREGISTRYFULLACCESS.
+	--> STORE AWS ECR URI IN JENKINS CREADENTAILS AND USE IN PIPELINE TO SECURE.
+	--> CONFIGURE SSH AGENT PLUGIN  in jenkins AND CREDENTIALS OF K3S SERVER 
+	--> INSTALL K3S AND ADD ROLE TO PULL THE IMAGE FROM ECR for k3s server 
+		 POLICY --   AMAZONEC2CONTAINERREGISTRYREADONLYACCESS.
+	
+--> main thing is k3s is not access to pull the image with role and policy also ,,, so we need to create secret in k3s 	server to pull the image from aws-ecr otherwise we end up with crashpullbackoff error,  (only k3s not k8s.)
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+pipeline {
+    agent any
+    environment {
+        AWS_REGION = 'us-east-1'
+        IMAGE_TAG = 'latest'
+    }
+    stages {
+        stage ('CHECKOUT') {
+            steps {
+                git branch: 'master', url: 'https://github.com/Devendranali/one.git'
+            }
+        }
+
+        stage ('MAVEN') {
+            steps {
+                sh 'mvn clean install -DskipTests'
+            }
+        }
+
+        stage ('TEST') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('JACOCO REPORT') {
+            steps {
+                sh 'mvn jacoco:report'
+                publishHTML(target: [
+                    reportDir: 'target/site/jacoco',
+                    reportFiles: 'index.html',
+                    reportName: 'JaCoCo Code Coverage',
+                    allowMissing: true,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true
+                ])
+            }
+        }
+
+        stage ('CODECOVERAGE') {
+            steps {
+                sh 'mvn checkstyle:checkstyle'
+            }
+        }
+
+        stage ('DEPENDENCY CHECK') {
+            steps {
+                sh 'mvn org.owasp:dependency-check-maven:check'
+            }
+        }
+
+        stage ('Stop and Remove Containers') {
+            steps {
+                script {
+                    sh 'docker stop $(docker ps -q) || true'
+                    sh 'docker rm -f $(docker ps -a -q) || true'
+                }
+            }
+        }
+
+        stage ('DOCKER BUILD') {
+            steps {
+                sh 'docker rmi $(docker images -f "dangling=true" -q) || true'
+                sh 'docker rmi -f $(docker images -q) || true'
+                sh 'docker build -t one:1 .'
+            }
+        }
+
+        stage ('TRIVY SCAN') {
+            steps {
+                script {
+                    sh 'trivy image --exit-code 1 --severity HIGH,CRITICAL one:1 || true'
+                }
+            }
+        }
+
+        stage ('ECR LOGIN AND PUSH') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'ecr-uri', variable: 'ECR_REPO')]) {
+                        sh """
+                            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO}
+                            docker tag one:1 ${ECR_REPO}:${IMAGE_TAG}
+                            docker push ${ECR_REPO}:${IMAGE_TAG}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage ('CONTAINER') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'ecr-uri', variable: 'ECR_REPO')]) {
+                        sh """
+                            docker rm -f myapp || true
+                            docker run -itd --name myapp -p 8081:8080 ${ECR_REPO}:${IMAGE_TAG}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage ('Deploy to K3s') {
+            steps {
+                sshagent(['jenkins-ssh-key']) {
+                    withCredentials([string(credentialsId: 'ecr-uri', variable: 'ECR_REPO')]) {
+                        sh """
+                            sed 's|__ECR_IMAGE__|${ECR_REPO}:${IMAGE_TAG}|' k8s/k8s-deployment.yaml > k8s/k8s-deployment-final.yaml
+                            scp -o StrictHostKeyChecking=no k8s/k8s-deployment-final.yaml ec2-user@54.163.209.189:/tmp/
+                            scp -o StrictHostKeyChecking=no k8s/service.yaml ec2-user@54.163.209.189:/tmp/
+                            ssh -o StrictHostKeyChecking=no ec2-user@54.163.209.189 'kubectl apply -f /tmp/k8s-deployment-final.yaml && kubectl apply -f /tmp/service.yaml'
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            junit 'target/surefire-reports/*.xml'
+            publishHTML(target: [
+                reportDir: 'target/dependency-check-report',
+                reportFiles: 'dependency-check-report.html',
+                reportName: 'Dependency Check Report',
+                allowMissing: true
+            ])
+        }
+    }
+}
+
+
+
+________________________________________________________________________________________
+
+SAMPLE JENKINS TASK BY CHATGPT
+
+
+pipeline {
+    agent any
+    tools {
+        jdk 'jdk'
+        maven 'maven'
+    }
+    environment {
+        git_repo = 'github.devendra.one'
+    }
+    parameters {
+        string(name: 'branch_name', defaultValue: 'main', description: 'Branch to pull from GitHub')
+    }
+    stages {
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+        stage('Git Checkout') {
+            steps {
+                git branch: "${params.branch_name}", url: "${git_repo}"
+            }
+        }
+        stage('Maven Build') {
+            steps {
+                sh 'mvn clean install -DskipTests'
+            }
+        }
+    }
+}
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ K8'S ---YAML FILES:
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+Ingress:
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+spec:
+  rules:
+    - host: your-ec2-public-ip
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: 
+                name: frontend-service
+                port:
+                  number: 80
+
+
+
+
+
+FRONTEND-DEPLOYMENT:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: your-dockerhub/frontend:latest
+          ports:
+            - containerPort: 80
+
+
+
+FRONTEND-SERVICE:
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+
+
+BACKEND-DEPLOYMENT:
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub/backend:latest
+          ports:
+            - containerPort: 4000
+          env:
+            - name: MONGO_URL
+              value: "mongodb://mongo-service:27017/mydb"
+
+
+BACKEND-SERVICE:
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+
+
+MONGO-DB-DEPLOYMENT:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:5
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-storage
+              mountPath: /data/db
+      volumes:
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongo-pvc
+
+
+
+MONGO-DB-SERVICE:
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+spec:
+  selector:
+    app: mongo
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+  clusterIP: None
+
+
+
+MONGO-DB-PV:
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/data/mongo
+
+
+MONGO-DB-PVC:
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+k8s - using k3s 
+
+
+
+
+# 🚀 Complete Kubernetes Ingress Setup Using K3s on AWS with GoDaddy Domain
+
+This guide walks you step-by-step through setting up a real-world Kubernetes environment using K3s on AWS EC2, installing an Ingress controller, deploying a sample app, and exposing it to the internet using a GoDaddy domain.
+
+---
+
+📌 PREREQUISITES:
+- You have a domain from GoDaddy.
+- You can launch EC2 instances in AWS.
+- You have basic knowledge of using SSH and Linux commands.
+
+---
+
+✅ STEP 1: Launch EC2 Instance (K3s Master Node)
+
+1. Open AWS Console and launch a new EC2 instance:
+   - OS: Ubuntu 22.04
+   - Instance type: t2.medium or t3.medium
+   - Enable Auto-assign Public IP
+   - Add an inbound rule in security group to allow ports: 22, 80, 443, 30000–32767
+
+2. SSH into the EC2 instance:
+
+   ssh -i your-key.pem ubuntu@<EC2_PUBLIC_IP>
+
+3. Install K3s (Kubernetes lightweight version):
+
+   curl -sfL https://get.k3s.io | sh -
+
+4. Confirm K3s is working:
+
+   sudo kubectl get nodes
+
+---
+
+✅ STEP 2: Install NGINX Ingress Controller
+
+1. Install the Ingress controller (this creates an AWS LoadBalancer):
+
+   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+2. Wait 1–2 minutes, then check the external IP/hostname:
+
+   kubectl get svc -n ingress-nginx
+
+3. Note the EXTERNAL-IP or HOSTNAME (e.g., a1b2c3d4.elb.amazonaws.com) — this is your public entry point.
+
+---
+
+✅ STEP 3: Deploy Your Application
+
+1. Apply the app Deployment and Service manifests:
+
+   kubectl apply -f k8s/app/deployment.yaml
+   kubectl apply -f k8s/app/service.yaml
+
+2. Apply the Ingress resource to expose the app through the domain:
+
+   kubectl apply -f k8s/app/ingress.yaml
+
+---
+
+✅ STEP 4: Configure DNS in GoDaddy
+
+1. Log in to your GoDaddy dashboard and go to DNS settings for your domain.
+
+2. Add a new DNS record:
+   - Type: CNAME
+   - Name: app
+   - Value: <your LoadBalancer hostname> (e.g., a1b2c3d4.elb.amazonaws.com)
+   - TTL: 600 seconds (or 1 minute)
+
+3. Save the record and wait a few minutes for DNS to propagate.
+
+---
+
+✅ STEP 5: Access Your Application
+
+Open your browser and visit:
+
+   http://app.yourdomain.com
+
+You should see the default NGINX welcome page.
+
+---
+
+💡 NEXT STEPS (Optional but Recommended)
+
+- Enable HTTPS with cert-manager and Let's Encrypt
+- Add multiple applications with different subdomains
+- Move this setup to Amazon EKS with minimal changes
+
+📁 Files Used:
+
+- k8s/app/deployment.yaml
+- k8s/app/service.yaml
+- k8s/app/ingress.yaml
+
+You're all set! 🎉
+
+
+
+
+
+
+give like multi user real time to access every one ?
+
+set up a real Kubernetes deployment, asking for a full, step-by-step mission to deploy a Kubernetes app on AWS
+take aws is cloud and domain for godaddy and configutred to route53 and give overall steps without missing any thing even its simple also dont skip and give steps in order one by one what to do how to do where to do in complete way every thing and explain brief in a remember easy way to understand for me !
+
+commander?
+
+ ive didnt tell this and can i use kops are eks which one real time use those we try, and i buyed domain in godaddy and later steps to route, first without helm we go, and explain every thing what we are doing, i dont know anything iam -0 so keep pin to pin if possible provide structure and arcticture folders and images also to understand
+asking how to make your Kubernetes application accessible to multiple users in real-time, like a real production or shared staging environment.
+
+
+
+
+
+
