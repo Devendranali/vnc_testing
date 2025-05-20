@@ -661,18 +661,34 @@ You're all set! 🎉
 
 
 
+Feature	Security Group	NACL
+Level	Instance level (ENI)	Subnet level
+Stateful	✅ Yes	❌ No
+Default Behavior	All inbound denied, all outbound allowed	All inbound/outbound denied
+Rules	Only "Allow" rules	Allow and Deny rules
+Use Case	Protect EC2 or RDS instances	Control traffic across subnets
+Applied To	ENIs, EC2s	Entire Subnet
+
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+web-application:
+
+A web application is a software program that runs on a web server and is accessed through a web browser. Unlike desktop applications that are installed on a specific machine, web applications can be used from anywhere through the internet.
+For example, applications like Gmail, Facebook, or online shopping sites like Amazon are web applications.
 
 
+overview:
 
-give like multi user real time to access every one ?
+In this project, I was responsible for building and automating cloud infrastructure for a web application using AWS. We used Terraform to create and manage resources like VPC, subnets, route tables, EC2 instances, and S3 buckets, following Infrastructure as Code principles.
 
-set up a real Kubernetes deployment, asking for a full, step-by-step mission to deploy a Kubernetes app on AWS
-take aws is cloud and domain for godaddy and configutred to route53 and give overall steps without missing any thing even its simple also dont skip and give steps in order one by one what to do how to do where to do in complete way every thing and explain brief in a remember easy way to understand for me !
+For application deployment, I set up Jenkins pipelines that handled automated builds, testing, and deployment. This allowed us to implement a full CI/CD pipeline, which reduced manual effort and improved reliability.
 
-commander?
+The application itself was Dockerized, so we used Docker to package and deploy it across environments consistently. We also stored our container images in Amazon ECR.
 
- ive didnt tell this and can i use kops are eks which one real time use those we try, and i buyed domain in godaddy and later steps to route, first without helm we go, and explain every thing what we are doing, i dont know anything iam -0 so keep pin to pin if possible provide structure and arcticture folders and images also to understand
-asking how to make your Kubernetes application accessible to multiple users in real-time, like a real production or shared staging environment.
+For monitoring, I configured Prometheus to collect performance metrics and Grafana to visualize them, which helped us monitor application health and system performance in real-time.
+
+My key responsibilities included maintaining CI/CD pipelines, containerizing the application, managing deployments, and setting up effective monitoring solutions. The entire infrastructure was designed to be scalable, repeatable, and easy to maintain.
+
+
 
 
 
