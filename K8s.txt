@@ -1,0 +1,511 @@
+
+ K8'S ---YAML FILES:
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+K8S - STRUCTURE:
+
+
+k8s/
+├── frontend/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   └── configmap.yaml
+├── backend/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── secret.yaml
+│   └── configmap.yaml
+├── mongo/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   └── pvc.yaml
+├── ingress/
+│   └── ingress.yaml
+└── README.md
+
+
+K8S - FLOW:
+
+[User Browser]
+      ↓
+   Ingress
+      ↓
+[frontend-service] ─────► [frontend pod]
+                           └─── fetch("http://backend-service:4000/api")
+                                        ↓
+                            [backend-service] ─────► [backend pod]
+                                                       └─── connects to MONGO_URL
+                                                                 ↓
+                                                    [mongo-service] ─────► [mongo pod]
+
+
+
+
+Ingress:
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+spec:
+  rules:
+    - host: your-ec2-public-ip
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: 
+                name: frontend-service
+                port:
+                  number: 80
+
+
+
+
+
+FRONTEND-DEPLOYMENT:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: your-dockerhub/frontend:latest
+          ports:
+            - containerPort: 80
+
+
+
+FRONTEND-SERVICE:
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+
+
+BACKEND-DEPLOYMENT:
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub/backend:latest
+          ports:
+            - containerPort: 4000
+          env:
+            - name: MONGO_URL
+              value: "mongodb://mongo-service:27017/mydb"
+
+
+BACKEND-SERVICE:
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+
+
+MONGO-DB-DEPLOYMENT:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:5
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-storage
+              mountPath: /data/db
+      volumes:
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongo-pvc
+
+
+
+MONGO-DB-SERVICE:
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+spec:
+  selector:
+    app: mongo
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+  clusterIP: None
+
+
+
+MONGO-DB-PV:
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/data/mongo
+
+
+MONGO-DB-PVC:
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+# ------------------- FRONTEND -------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  REACT_APP_API_URL: "http://backend-service:4000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: your-dockerhub/frontend:latest
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: frontend-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+
+# ------------------- BACKEND -------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-secret
+type: Opaque
+data:
+  MONGO_URL: bW9uZ29kYjovL21vbmdvLXNlcnZpY2U6MjcwMTcvbXlkYg==
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  NODE_ENV: "production"
+  PORT: "4000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub/backend:latest
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: mongo-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 4000
+      targetPort: 4000
+  type: ClusterIP
+
+# ------------------- MONGODB -------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:5
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-storage
+              mountPath: /data/db
+      volumes:
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongo-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+spec:
+  selector:
+    app: mongo
+  ports:
+    - port: 27017
+      targetPort: 27017
+  clusterIP: None
+
+# ------------------- INGRESS -------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - host: your-app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+k8s - using k3s 
+
+
+
+
+# 🚀 Complete Kubernetes Ingress Setup Using K3s on AWS with GoDaddy Domain
+
+This guide walks you step-by-step through setting up a real-world Kubernetes environment using K3s on AWS EC2, installing an Ingress controller, deploying a sample app, and exposing it to the internet using a GoDaddy domain.
+
+---
+
+📌 PREREQUISITES:
+- You have a domain from GoDaddy.
+- You can launch EC2 instances in AWS.
+- You have basic knowledge of using SSH and Linux commands.
+
+---
+
+✅ STEP 1: Launch EC2 Instance (K3s Master Node)
+
+1. Open AWS Console and launch a new EC2 instance:
+   - OS: Ubuntu 22.04
+   - Instance type: t2.medium or t3.medium
+   - Enable Auto-assign Public IP
+   - Add an inbound rule in security group to allow ports: 22, 80, 443, 30000–32767
+
+2. SSH into the EC2 instance:
+
+   ssh -i your-key.pem ubuntu@<EC2_PUBLIC_IP>
+
+3. Install K3s (Kubernetes lightweight version):
+
+   curl -sfL https://get.k3s.io | sh -
+
+4. Confirm K3s is working:
+
+   sudo kubectl get nodes
+
+---
+
+✅ STEP 2: Install NGINX Ingress Controller
+
+1. Install the Ingress controller (this creates an AWS LoadBalancer):
+
+   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+2. Wait 1–2 minutes, then check the external IP/hostname:
+
+   kubectl get svc -n ingress-nginx
+
+3. Note the EXTERNAL-IP or HOSTNAME (e.g., a1b2c3d4.elb.amazonaws.com) — this is your public entry point.
+
+---
+
+✅ STEP 3: Deploy Your Application
+
+1. Apply the app Deployment and Service manifests:
+
+   kubectl apply -f k8s/app/deployment.yaml
+   kubectl apply -f k8s/app/service.yaml
+
+2. Apply the Ingress resource to expose the app through the domain:
+
+   kubectl apply -f k8s/app/ingress.yaml
+
+---
+
+✅ STEP 4: Configure DNS in GoDaddy
+
+1. Log in to your GoDaddy dashboard and go to DNS settings for your domain.
+
+2. Add a new DNS record:
+   - Type: CNAME
+   - Name: app
+   - Value: <your LoadBalancer hostname> (e.g., a1b2c3d4.elb.amazonaws.com)
+   - TTL: 600 seconds (or 1 minute)
+
+3. Save the record and wait a few minutes for DNS to propagate.
+
+---
+
+✅ STEP 5: Access Your Application
+
+Open your browser and visit:
+
+   http://app.yourdomain.com
+
+You should see the default NGINX welcome page.
+
+---
+
+💡 NEXT STEPS (Optional but Recommended)
+
+- Enable HTTPS with cert-manager and Let's Encrypt
+- Add multiple applications with different subdomains
+- Move this setup to Amazon EKS with minimal changes
+
+📁 Files Used:
+
+- k8s/app/deployment.yaml
+- k8s/app/service.yaml
+- k8s/app/ingress.yaml
+
+You're all set! 🎉
