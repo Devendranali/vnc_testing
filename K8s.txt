@@ -1,3 +1,46 @@
+k8'S -- ARCHITECTURE:-
+
+
+Kubernetes Architecture Overview 🏗️
+Kubernetes follows a control plane-data plane model, where the control plane manages the cluster, and the data plane runs the application workloads.
+
+Control Plane  (MANAGER NODE) – Manages the Cluster
+
+The control plane controls and manages the whole Kubernetes cluster.
+
+API Server 📡 – Entry point for all requests. It exposes the Kubernetes API and talks to all other parts.
+
+Scheduler 📅 – Chooses which node will run each pod, based on available resources.
+
+Controller Manager 🎛️ – Runs background tasks (like restarting failed pods or checking node health).
+
+etcd 💾 – A key-value database that stores all cluster data safely.
+
+
+DATA  PLANE (WORKER NODE)  – Runs Applications
+
+This part runs on worker nodes and handles real applications (containers).
+
+Kubelet 🏗️ – Agent on each node. It takes orders from the control plane and runs the pods.
+
+Container Runtime 🛠️ – Runs containers inside pods. Examples: Docker, containerd, CRI-O.
+
+Kube Proxy 🔄 – Manages network communication inside the cluster and with outside clients.
+
+Pods 🏠 – The smallest unit in Kubernetes. Each pod runs one or more containers.
+
+Containers 📦 – These run your app code and make it easy to scale and move anywhere.
+
+
+How It Works (Workflow)
+The API Server validates and processes the request.
+The Scheduler assigns workloads (pods) to worker nodes.
+Controllers monitor and manage the cluster state.
+Kubelet makes sure the Pods are running properly.
+Kube Proxy and Services manage networking and communication.
+
+
+
 
  K8'S ---YAML FILES:
 
@@ -5,23 +48,101 @@
 K8S - STRUCTURE:
 
 
-k8s/
-├── frontend/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   └── configmap.yaml
-├── backend/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   ├── secret.yaml
-│   └── configmap.yaml
-├── mongo/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   └── pvc.yaml
-├── ingress/
-│   └── ingress.yaml
-└── README.md
+project-root/
+├── frontend-app/                        # Frontend (React + Node.js)
+│   ├── public/
+│   ├── src/
+│   │   ├── components/                  # Reusable UI components
+│   │   ├── pages/                       # Route-based views
+│   │   ├── services/                    # API interaction logic
+│   │   ├── hooks/                       # Custom React hooks
+│   │   ├── store/                       # Redux/Zustand state management
+│   │   ├── utils/                       # Helpers and utilities
+│   │   ├── assets/                      # Images, fonts, styles
+│   │   └── config/                      # Environment-specific settings
+│   ├── package.json
+│   ├── Dockerfile
+│   ├── .gitignore
+│   ├── .dockerignore
+│   ├── tsconfig.json                    # If using TypeScript
+│   ├── .eslintrc.json                   # ESLint config
+│   ├── .prettierrc.json                 # Prettier formatting rules
+│   └── README.md
+
+├── backend-app/                         # Backend (FastAPI + Python)
+│   ├── app/
+│   │   ├── main.py                      # App entry point
+│   │   ├── api/
+│   │   │   ├── routes/                  # API route handlers
+│   │   │   └── dependencies/            # Dependency injection (e.g., DB)
+│   │   ├── models/                      # Mongo models (ODM/ORM)
+│   │   ├── schemas/                     # Pydantic schemas
+│   │   ├── services/                    # Business logic layer
+│   │   ├── utils/                       # Utilities/helpers
+│   │   ├── config.py                    # App configuration
+│   │   ├── logs/                        # Logging setup
+│   │   ├── workers/                     # Background tasks (e.g., Celery)
+│   │   └── tests/                       # Unit/integration tests
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   ├── .env
+│   ├── .gitignore
+│   ├── .dockerignore
+│   └── README.md
+
+├── database/                            # MongoDB init & dev setup
+│   ├── init/
+│   │   └── init.js                      # Seed data / DB setup script
+│   ├── migrations/                      # Manual or scripted schema changes
+│   ├── scripts/                         # Backup/restore or admin tools
+│   ├── docker-entrypoint.sh             # Optional custom entrypoint
+│   ├── Dockerfile                       # Optional for custom Mongo image
+│   ├── .env                             # MongoDB local env vars
+│   └── README.md
+
+├── k8s/                                 # Kubernetes manifests
+│   ├── frontend/
+│   │   ├── deployment.yaml
+│   │   ├── service.yaml
+│   │   └── configmap.yaml
+│   ├── backend/
+│   │   ├── deployment.yaml
+│   │   ├── service.yaml
+│   │   ├── configmap.yaml
+│   │   ├── secret.yaml
+│   │   └── env.example
+│   ├── mongo/
+│   │   ├── deployment.yaml
+│   │   ├── service.yaml
+│   │   └── pvc.yaml
+│   ├── ingress/
+│   │   └── ingress.yaml
+│   ├── monitoring/                      # Prometheus, Grafana (optional)
+│   ├── helm/                            # Optional: Helm charts
+│   ├── secrets/                         # Optional: Sealed secrets or SOPS
+│   ├── namespace.yaml
+│   └── kustomization.yaml               # Optional: kustomize support
+
+├── tests/                               # Global testing
+│   ├── unit/
+│   ├── integration/
+│   ├── e2e/
+│   ├── mocks/
+│   └── README.md
+
+├── docs/                                # Documentation
+│   ├── API.md
+│   ├── Architecture.md
+│   ├── Setup.md
+│   ├── diagrams/
+│   └── README.md
+
+├── docker-compose.yaml                  # Local development/test environment
+├── .gitignore
+├── README.md                            # Project overview
+└── LICENSE
+
+
 
 
 K8S - FLOW:
@@ -37,6 +158,27 @@ K8S - FLOW:
                                                        └─── connects to MONGO_URL
                                                                  ↓
                                                     [mongo-service] ─────► [mongo pod]
+
+
+
+
+apiVersion: Specifies the Kubernetes API version. In this case, it’s using the “apps/v1” API version, which is appropriate for Deployments.
+kind: Specifies the type of Kubernetes resource. Here, it’s “Deployment,” indicating that this configuration file is defining a Deployment.
+spec: This section defines the desired state of the Deployment.
+replicas: 3: Specifies that you want to run three replicas of your application.
+selector: Describes the selector to match pods managed by this Deployment.
+matchLabels: Specifies the labels that the Replica Set created by the Deployment should use to select the pods it manages. In this case, pods with the label app: example are selected.
+template: Defines the pod template used for creating new pods.
+metadata: Contains the labels to apply to the pods created from this template. In this case, the pods will have the label app: example.
+spec: Describes the specification of the pods.
+containers: This section specifies the containers to run in the pod.
+name: example-container: Assigns a name to the container.
+image: example-image: Specifies the Docker image to use for this container.
+ports: Defines the ports to open in the container.
+containerPort: 8080: Indicates that the container will listen on port 80.
+
+
+
 
 
 
@@ -239,7 +381,7 @@ kind: ConfigMap
 metadata:
   name: frontend-config
 data:
-  REACT_APP_API_URL: "http://backend-service:4000"
+  REACT_APP_API_URL:  
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -509,3 +651,226 @@ You should see the default NGINX welcome page.
 - k8s/app/ingress.yaml
 
 You're all set! 🎉
+
+
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# MongoDB Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-secret
+type: Opaque
+data:
+  MONGO_INITDB_ROOT_USERNAME: bW9uZ29hZG1pbg==      # mongoadmin
+  MONGO_INITDB_ROOT_PASSWORD: c2VjcmV0cGFzcw==      # secretpass
+---
+# MongoDB Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# MongoDB Deployment and Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_INITDB_ROOT_PASSWORD
+          volumeMounts:
+            - name: mongo-storage
+              mountPath: /data/db
+      volumes:
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongo-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+spec:
+  selector:
+    app: mongo
+  ports:
+    - port: 27017
+---
+# Backend ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  MONGO_URI: mongodb://mongoadmin:secretpass@mongo-service:27017/mydb
+---
+# Backend Deployment and Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/backend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: MONGO_URI
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /api/users
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /api/users
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+# Backend HPA (Horizontal Pod Autoscaler)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+---
+# Frontend Deployment and Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: your-dockerhub-username/frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
+---
+# Ingress Resource for Pretty Access (e.g. http://myapp.local)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myapp-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - host: myapp.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+
