@@ -997,7 +997,7 @@ spec:
       storage: 5Gi
   storageClassName: gp2
 
----
+----------
 # Database Secret (replace base64 values)
 apiVersion: v1
 kind: Secret
@@ -1008,7 +1008,7 @@ data:
   # MYSQL_ROOT_PASSWORD must be base64 encoded
   MYSQL_ROOT_PASSWORD: bXktc2VjcmV0LXBhc3N3b3Jk
 
----
+---------
 # Database Deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -1042,7 +1042,7 @@ spec:
           persistentVolumeClaim:
             claimName: mysql_db
 
----
+---------
 # Database Service
 apiVersion: v1
 kind: Service
