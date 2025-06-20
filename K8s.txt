@@ -874,3 +874,449 @@ spec:
                 port:
                   number: 80
 
+
+_______________________________________________________________________________________
+
+
+---
+# Frontend ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontconfig
+data:
+  backend_api: "backend_service"
+
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontapp
+  labels:
+    demo: front
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      demo: front
+  template:
+    metadata:
+      labels:
+        demo: front
+    spec:
+      containers:
+        - name: frontapp
+          image: frontimage
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: frontconfig
+
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontappservice
+spec:
+  selector:
+    demo: front
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+
+---
+# Backend Secret (replace base64 values)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backendsecret
+type: Opaque
+data:
+  # Example mysql_url, base64 encode your actual connection string like:
+  # mysql_url: mysql://root:<password>@databaseservice:3306/mydb
+  mysql_url: bXlzcWxfdXJsX2hlcmU= 
+
+---
+# Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backendapp
+  labels:
+    demo: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      demo: backend
+  template:
+    metadata:
+      labels:
+        demo: backend
+    spec:
+      containers:
+        - name: backapp
+          image: backendimage
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - secretRef:
+                name: backendsecret
+
+---
+# Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend_service
+spec:
+  selector:
+    demo: backend
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+
+---
+# Database PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql_db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: gp2
+
+---
+# Database Secret (replace base64 values)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+type: Opaque
+data:
+  # MYSQL_ROOT_PASSWORD must be base64 encoded
+  MYSQL_ROOT_PASSWORD: bXktc2VjcmV0LXBhc3N3b3Jk
+
+---
+# Database Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: databaseapp
+  labels:
+    demo: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      demo: database
+  template:
+    metadata:
+      labels:
+        demo: database
+    spec:
+      containers:
+        - name: db
+          image: mysql:8
+          ports:
+            - containerPort: 3306
+          envFrom:
+            - secretRef:
+                name: mysql-secret
+          volumeMounts:
+            - name: db-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: mysql_db
+
+---
+# Database Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: databaseservice
+spec:
+  type: ClusterIP
+  selector:
+    demo: database
+  ports:
+    - port: 3306
+      targetPort: 3306
+      protocol: TCP
+
+
+
+*********************
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata: 
+  name: spy-famil-app
+---
+# Frontend ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontconfig
+  namespace: spy-famil-app
+data:
+  backend_api: "backend_service"
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: frontapp
+  namespace: spy-famil-app
+  labels:
+    demo: front
+spec:
+  replicas: 2
+  selector: 
+    matchLabels:
+      demo: front
+  template:
+    metadata:
+      labels:
+        demo: front
+    spec:
+      containers:
+      - name: frontapp
+        image: frontimage
+        ports:
+        - containerPort: 3000
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        envFrom:
+        - configMapRef:
+            name: frontconfig
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontappservice
+  namespace: spy-famil-app
+spec:
+  selector:
+    demo: front
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+---
+# Backend ConfigMap (used instead of Secret)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backendconfig
+  namespace: spy-famil-app
+data:
+  mysql_url: "databaseservice"
+---
+# Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backendapp
+  namespace: spy-famil-app
+  labels:
+    demo: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      demo: backend
+  template:
+    metadata:
+      labels:
+        demo: backend
+    spec:
+      containers:
+      - name: backapp
+        image: backendimage
+        ports:
+        - containerPort: 8001
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        envFrom:
+        - configMapRef:
+            name: backendconfig
+---
+# Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend_service
+  namespace: spy-famil-app
+spec:
+  selector:
+    demo: backend
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+---
+# MySQL Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: spy-famil-app
+type: Opaque
+data:
+  MYSQL_ROOT_PASSWORD: bXktc2VjcmV0LXBhc3N3b3Jk
+---
+# MySQL PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: 
+  name: mysql_db
+  namespace: spy-famil-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: gp2
+---
+# MySQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: databaseapp
+  namespace: spy-famil-app
+  labels:
+    demo: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      demo: database
+  template:
+    metadata:
+      labels:
+        demo: database
+    spec:
+      containers:
+      - name: db
+        image: mysql:8
+        ports:
+        - containerPort: 3306
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        envFrom:
+        - secretRef:
+            name: mysql-secret
+        volumeMounts:
+        - name: db-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: db-storage
+        persistentVolumeClaim:
+          claimName: mysql_db
+---
+# MySQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: databaseservice
+  namespace: spy-famil-app
+spec:
+  type: ClusterIP
+  selector:
+    demo: database
+  ports:
+  - port: 3306
+    targetPort: 3306
+    protocol: TCP
+---
+# Ingress Resource
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-Ingress
+  namespace: spy-famil-app
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: spy-family
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontappservice
+            port:
+              number: 3000
+
